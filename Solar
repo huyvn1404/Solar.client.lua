@@ -1,0 +1,564 @@
+
+local Players = game:GetService("Players")
+local UIS = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local Player = Players.LocalPlayer
+
+local Settings = {
+    FlySpeed = 50,
+    JumpPower = 100,
+    WalkSpeed = 32
+}
+
+local State = {
+    Fly = false,
+    LockCam = false,
+    HighJump = false,
+    Speed = false,
+    InfiniteJump = false
+}
+
+local Vertical = 0
+local FlyConnection
+local OldCamera
+
+local function getCharacter()
+    local Character = Player.Character
+    if not Character then return end
+
+    local Humanoid = Character:FindFirstChildOfClass("Humanoid")
+    local Root = Character:FindFirstChild("HumanoidRootPart")
+
+    if Humanoid and Root then
+        return Character, Humanoid, Root
+    end
+end
+
+local function newInstance(class, properties, parent)
+    local object = Instance.new(class)
+
+    for key, value in pairs(properties) do
+        object[key] = value
+    end
+
+    object.Parent = parent
+    return object
+end
+
+local GUI = newInstance("ScreenGui", {
+    Name = "SolarUI",
+    ResetOnSpawn = false
+}, Player:WaitForChild("PlayerGui"))
+
+local Main = newInstance("Frame", {
+    Size = UDim2.fromOffset(600, 420),
+    Position = UDim2.new(0.5, -300, 0.5, -210),
+    BackgroundColor3 = Color3.fromRGB(25, 18, 40),
+    BorderSizePixel = 0
+}, GUI)
+
+newInstance("UICorner", {
+    CornerRadius = UDim.new(0, 14)
+}, Main)
+
+newInstance("UIStroke", {
+    Color = Color3.fromRGB(145, 95, 200),
+    Thickness = 1.5
+}, Main)
+
+local Scale = newInstance("UIScale", {}, Main)
+
+local function resize()
+    local Camera = workspace.CurrentCamera
+    if Camera then
+        local Size = Camera.ViewportSize
+        Scale.Scale = math.clamp(
+            math.min(Size.X / 630, Size.Y / 450),
+            0.45,
+            1
+        )
+    end
+end
+
+resize()
+workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(resize)
+
+local Header = newInstance("Frame", {
+    Size = UDim2.new(1, 0, 0, 48),
+    BackgroundColor3 = Color3.fromRGB(45, 28, 68),
+    BorderSizePixel = 0
+}, Main)
+
+newInstance("UICorner", {
+    CornerRadius = UDim.new(0, 14)
+}, Header)
+
+local Title = newInstance("TextLabel", {
+    Size = UDim2.new(1, -60, 1, 0),
+    Position = UDim2.fromOffset(15, 0),
+    BackgroundTransparency = 1,
+    Text = "☾ SOLAR",
+    TextColor3 = Color3.fromRGB(220, 190, 255),
+    Font = Enum.Font.GothamBold,
+    TextSize = 23,
+    TextXAlignment = Enum.TextXAlignment.Left
+}, Header)
+
+local Close = newInstance("TextButton", {
+    Size = UDim2.fromOffset(38, 32),
+    Position = UDim2.new(1, -45, 0, 8),
+    BackgroundColor3 = Color3.fromRGB(100, 60, 140),
+    Text = "X",
+    TextColor3 = Color3.new(1, 1, 1),
+    Font = Enum.Font.GothamBold,
+    TextSize = 15
+}, Header)
+
+newInstance("UICorner", {
+    CornerRadius = UDim.new(0, 8)
+}, Close)
+
+local Sidebar = newInstance("Frame", {
+    Position = UDim2.fromOffset(10, 58),
+    Size = UDim2.fromOffset(130, 350),
+    BackgroundColor3 = Color3.fromRGB(36, 27, 52),
+    BorderSizePixel = 0
+}, Main)
+
+newInstance("UICorner", {
+    CornerRadius = UDim.new(0, 10)
+}, Sidebar)
+
+local SideLayout = newInstance("UIListLayout", {
+    Padding = UDim.new(0, 9),
+    HorizontalAlignment = Enum.HorizontalAlignment.Center,
+    SortOrder = Enum.SortOrder.LayoutOrder
+}, Sidebar)
+
+local Pages = {}
+
+local Content = newInstance("Frame", {
+    Position = UDim2.fromOffset(150, 58),
+    Size = UDim2.fromOffset(440, 350),
+    BackgroundTransparency = 1
+}, Main)
+
+for _, Name in ipairs({"COMBAT", "MOVEMENT", "SETTINGS"}) do
+    local Page = newInstance("ScrollingFrame", {
+        Size = UDim2.fromScale(1, 1),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        ScrollBarThickness = 3,
+        CanvasSize = UDim2.new(),
+        AutomaticCanvasSize = Enum.AutomaticSize.Y,
+        Visible = false
+    }, Content)
+
+    newInstance("UIListLayout", {
+        Padding = UDim.new(0, 9),
+        SortOrder = Enum.SortOrder.LayoutOrder
+    }, Page)
+
+    Pages[Name] = Page
+
+    local Tab = newInstance("TextButton", {
+        Size = UDim2.fromOffset(120, 42),
+        BackgroundColor3 = Color3.fromRGB(75, 45, 105),
+        Text = Name,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.GothamBold,
+        TextSize = 13,
+        LayoutOrder = #Pages
+    }, Sidebar)
+
+    newInstance("UICorner", {
+        CornerRadius = UDim.new(0, 8)
+    }, Tab)
+
+    Tab.Activated:Connect(function()
+        for _, OtherPage in pairs(Pages) do
+            OtherPage.Visible = false
+        end
+        Page.Visible = true
+    end)
+end
+
+Pages.COMBAT.Visible = true
+
+local function createButton(Page, Name)
+    local Button = newInstance("TextButton", {
+        Size = UDim2.new(1, -8, 0, 42),
+        BackgroundColor3 = Color3.fromRGB(75, 45, 105),
+        Text = Name,
+        TextColor3 = Color3.new(1, 1, 1),
+        Font = Enum.Font.GothamBold,
+        TextSize = 14
+    }, Page)
+
+    newInstance("UICorner", {
+        CornerRadius = UDim.new(0, 8)
+    }, Button)
+
+    return Button
+end
+
+local function createToggle(Page, Name, Callback)
+    local Enabled = false
+    local Button = createButton(Page, Name .. ": OFF")
+
+    local function Set(value)
+        Enabled = value
+        Button.Text = Name .. (Enabled and ": ON" or ": OFF")
+        Button.BackgroundColor3 = Enabled
+            and Color3.fromRGB(145, 90, 190)
+            or Color3.fromRGB(75, 45, 105)
+    end
+
+    Button.Activated:Connect(function()
+        Set(not Enabled)
+        Callback(Enabled)
+    end)
+
+    return Set
+end
+
+local function createInput(Page, Name, Default)
+    local Box = newInstance("TextBox", {
+        Size = UDim2.new(1, -8, 0, 40),
+        BackgroundColor3 = Color3.fromRGB(45, 34, 65),
+        TextColor3 = Color3.new(1, 1, 1),
+        PlaceholderText = Name,
+        Text = tostring(Default),
+        ClearTextOnFocus = false,
+        Font = Enum.Font.Gotham,
+        TextSize = 14
+    }, Page)
+
+    newInstance("UICorner", {
+        CornerRadius = UDim.new(0, 8)
+    }, Box)
+
+    return Box
+end
+
+local function updateSetting(Box, Key)
+    local Value = tonumber(Box.Text)
+
+    if Value then
+        Settings[Key] = math.clamp(Value, 1, 250)
+    end
+
+    Box.Text = tostring(Settings[Key])
+end
+
+local FlyUp = createButton(Pages.MOVEMENT, "HOLD TO FLY UP")
+local FlyDown = createButton(Pages.MOVEMENT, "HOLD TO FLY DOWN")
+
+FlyUp.Visible = false
+FlyDown.Visible = false
+
+local function stopFly()
+    State.Fly = false
+    Vertical = 0
+
+    if FlyConnection then
+        FlyConnection:Disconnect()
+        FlyConnection = nil
+    end
+
+    local _, Humanoid = getCharacter()
+
+    if Humanoid then
+        Humanoid.PlatformStand = false
+        Humanoid.AutoRotate = true
+        Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+    end
+
+    FlyUp.Visible = false
+    FlyDown.Visible = false
+end
+
+local function startFly()
+    stopFly()
+
+    local _, Humanoid, Root = getCharacter()
+    if not Humanoid or not Root then return end
+
+    State.Fly = true
+    Humanoid.AutoRotate = false
+    Humanoid.PlatformStand = true
+    Humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+
+    FlyUp.Visible = true
+    FlyDown.Visible = true
+
+    FlyConnection = RunService.Heartbeat:Connect(function(DeltaTime)
+        if not State.Fly or not Root.Parent or Humanoid.Health <= 0 then
+            stopFly()
+            return
+        end
+
+        local Direction = Humanoid.MoveDirection
+        local Movement = Direction * Settings.FlySpeed
+        local Height = Vector3.new(
+            0,
+            Vertical * Settings.FlySpeed,
+            0
+        )
+
+        Root.CFrame = Root.CFrame + (Movement + Height) * DeltaTime
+    end)
+end
+
+local function holdButton(Button, Value)
+    Button.InputBegan:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.Touch
+            or Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            Vertical = Value
+        end
+    end)
+
+    Button.InputEnded:Connect(function(Input)
+        if Input.UserInputType == Enum.UserInputType.Touch
+            or Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if Vertical == Value then
+                Vertical = 0
+            end
+        end
+    end)
+end
+
+holdButton(FlyUp, 1)
+holdButton(FlyDown, -1)
+
+local SetFly = createToggle(Pages.MOVEMENT, "Fly", function(Enabled)
+    if Enabled then
+        startFly()
+    else
+        stopFly()
+    end
+end)
+
+local SetLockCam = createToggle(Pages.COMBAT, "LockCam", function(Enabled)
+    local Camera = workspace.CurrentCamera
+    local _, Humanoid, Root = getCharacter()
+
+    if Enabled then
+        local Folder = workspace:FindFirstChild("Targets")
+        if not Folder or not Root then
+            State.LockCam = false
+            return
+        end
+
+        local Nearest
+        local Distance = math.huge
+
+        for _, Target in ipairs(Folder:GetChildren()) do
+            local TargetHumanoid = Target:FindFirstChildOfClass("Humanoid")
+            local TargetRoot = Target:FindFirstChild("HumanoidRootPart")
+
+            if TargetHumanoid and TargetRoot and TargetHumanoid.Health > 0 then
+                local CurrentDistance = (Root.Position - TargetRoot.Position).Magnitude
+
+                if CurrentDistance < Distance then
+                    Distance = CurrentDistance
+                    Nearest = TargetHumanoid
+                end
+            end
+        end
+
+        if Nearest then
+            OldCamera = Camera.CameraSubject
+            Camera.CameraSubject = Nearest
+            State.LockCam = true
+        else
+            SetLockCam(false)
+        end
+    else
+        Camera.CameraSubject = Humanoid or OldCamera
+        State.LockCam = false
+    end
+end)
+
+local SetJump = createToggle(Pages.MOVEMENT, "High Jump", function(Enabled)
+    State.HighJump = Enabled
+
+    local _, Humanoid = getCharacter()
+    if Humanoid then
+        Humanoid.UseJumpPower = true
+        Humanoid.JumpPower = Enabled and Settings.JumpPower or 50
+    end
+end)
+
+local SetSpeed = createToggle(Pages.MOVEMENT, "Speed", function(Enabled)
+    State.Speed = Enabled
+
+    local _, Humanoid = getCharacter()
+    if Humanoid then
+        Humanoid.WalkSpeed = Enabled and Settings.WalkSpeed or 16
+    end
+end)
+
+local SetInfiniteJump = createToggle(Pages.MOVEMENT, "Infinite Jump", function(Enabled)
+    State.InfiniteJump = Enabled
+end)
+
+UIS.JumpRequest:Connect(function()
+    if State.InfiniteJump then
+        local _, Humanoid = getCharacter()
+
+        if Humanoid then
+            Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+UIS.InputBegan:Connect(function(Input, Processed)
+    if Processed or not State.Fly then return end
+
+    if Input.KeyCode == Enum.KeyCode.Space then
+        Vertical = 1
+    elseif Input.KeyCode == Enum.KeyCode.LeftControl then
+        Vertical = -1
+    end
+end)
+
+UIS.InputEnded:Connect(function(Input)
+    if Input.KeyCode == Enum.KeyCode.Space
+        or Input.KeyCode == Enum.KeyCode.LeftControl then
+        Vertical = 0
+    end
+end)
+
+local FlyBox = createInput(Pages.SETTINGS, "Fly Speed", Settings.FlySpeed)
+local JumpBox = createInput(Pages.SETTINGS, "Jump Power", Settings.JumpPower)
+local SpeedBox = createInput(Pages.SETTINGS, "Walk Speed", Settings.WalkSpeed)
+
+FlyBox.FocusLost:Connect(function()
+    updateSetting(FlyBox, "FlySpeed")
+end)
+
+JumpBox.FocusLost:Connect(function()
+    updateSetting(JumpBox, "JumpPower")
+    if State.HighJump then
+        local _, Humanoid = getCharacter()
+        if Humanoid then
+            Humanoid.JumpPower = Settings.JumpPower
+        end
+    end
+end)
+
+SpeedBox.FocusLost:Connect(function()
+    updateSetting(SpeedBox, "WalkSpeed")
+    if State.Speed then
+        local _, Humanoid = getCharacter()
+        if Humanoid then
+            Humanoid.WalkSpeed = Settings.WalkSpeed
+        end
+    end
+end)
+
+local Reset = createButton(Pages.SETTINGS, "RESET SETTINGS")
+
+Reset.Activated:Connect(function()
+    stopFly()
+    SetFly(false)
+    SetLockCam(false)
+    SetJump(false)
+    SetSpeed(false)
+    SetInfiniteJump(false)
+
+    Settings.FlySpeed = 50
+    Settings.JumpPower = 100
+    Settings.WalkSpeed = 32
+
+    FlyBox.Text = "50"
+    JumpBox.Text = "100"
+    SpeedBox.Text = "32"
+
+    local _, Humanoid = getCharacter()
+    if Humanoid then
+        Humanoid.WalkSpeed = 16
+        Humanoid.JumpPower = 50
+        Humanoid.PlatformStand = false
+        Humanoid.AutoRotate = true
+    end
+end)
+
+local Restore = newInstance("TextButton", {
+    Name = "RestoreSolar",
+    Size = UDim2.fromOffset(110, 38),
+    Position = UDim2.new(0, 15, 0.5, 0),
+    BackgroundColor3 = Color3.fromRGB(95, 55, 135),
+    Text = "☾ SOLAR",
+    TextColor3 = Color3.new(1, 1, 1),
+    Font = Enum.Font.GothamBold,
+    TextSize = 15,
+    Visible = false
+}, GUI)
+
+newInstance("UICorner", {
+    CornerRadius = UDim.new(0, 8)
+}, Restore)
+
+Close.Activated:Connect(function()
+    Main.Visible = false
+    Restore.Visible = true
+end)
+
+Restore.Activated:Connect(function()
+    Main.Visible = true
+    Restore.Visible = false
+end)
+
+local Dragging = false
+local DragStart
+local StartPosition
+
+Header.InputBegan:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.MouseButton1
+        or Input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = true
+        DragStart = Input.Position
+        StartPosition = Main.Position
+    end
+end)
+
+UIS.InputChanged:Connect(function(Input)
+    if Dragging and (
+        Input.UserInputType == Enum.UserInputType.MouseMovement
+        or Input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        local Delta = Input.Position - DragStart
+        Main.Position = UDim2.new(
+            StartPosition.X.Scale,
+            StartPosition.X.Offset + Delta.X,
+            StartPosition.Y.Scale,
+            StartPosition.Y.Offset + Delta.Y
+        )
+    end
+end)
+
+UIS.InputEnded:Connect(function(Input)
+    if Input.UserInputType == Enum.UserInputType.MouseButton1
+        or Input.UserInputType == Enum.UserInputType.Touch then
+        Dragging = false
+    end
+end)
+
+Player.CharacterAdded:Connect(function()
+    stopFly()
+    State.LockCam = false
+    State.HighJump = false
+    State.Speed = false
+    State.InfiniteJump = false
+
+    SetFly(false)
+    SetLockCam(false)
+    SetJump(false)
+    SetSpeed(false)
+    SetInfiniteJump(false)
+end)
+
+print("☾ SOLAR TEST V1 loaded!")
